@@ -1,6 +1,6 @@
 module jellyfin-erroneous-tvdbid-batch-cleaner
 
-go 1.23.2
+go 1.23.3
 
 require github.com/sj14/jellyfin-go v0.3.0
 

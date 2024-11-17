@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -12,18 +11,18 @@ import (
 
 func makeConfig() *jf.Configuration {
 	server := os.Getenv("JELLYCTL_URL")
-	if strings.TrimSpace(server) == "" {
+	if server == "" {
 		server = "http://127.0.0.1:8096"
 	}
 
 	token := os.Getenv("JELLYCTL_TOKEN")
-	if strings.TrimSpace(token) == "" {
+	if token == "" {
 		log.Fatalln("JELLYCTL_TOKEN environment variable not set")
 	}
 
 	return &jf.Configuration{
 		Servers:       jf.ServerConfigurations{{URL: server}},
-		DefaultHeader: map[string]string{"Authorization": fmt.Sprintf(`MediaBrowser Token="%s"`, token)},
+		DefaultHeader: map[string]string{"Authorization": `MediaBrowser Token="` + token + `"`},
 		Debug:         len(os.Args) == 2 && os.Args[1] == "--debug",
 	}
 }
@@ -35,8 +34,7 @@ func getFirstAdminUserId(ctx context.Context, client *jf.APIClient) string {
 	}
 
 	for _, user := range users {
-		policy := user.GetPolicy()
-		if policy.GetIsAdministrator() {
+		if policy := user.GetPolicy(); policy.GetIsAdministrator() {
 			return user.GetId()
 		}
 	}
@@ -44,7 +42,7 @@ func getFirstAdminUserId(ctx context.Context, client *jf.APIClient) string {
 	return ""
 }
 
-func removeBadTvdbIdAndLock(ctx context.Context, client *jf.APIClient, itemId string, userId string) {
+func removeBadTvdbIdAndLock(ctx context.Context, client *jf.APIClient, itemId, userId string) {
 	item, _, err := client.UserLibraryAPI.GetItem(ctx, itemId).UserId(userId).Execute()
 	if err != nil {
 		log.Println("Error when calling `GetItem`:", err)
@@ -83,8 +81,8 @@ func main() {
 	}
 
 	for _, item := range allItems.Items {
-		if strings.HasPrefix(item.ProviderIds["Tvdb"], "tt") {
-			fmt.Println(item.GetName(), item.ProviderIds["Tvdb"])
+		if tvdbProviderId := item.ProviderIds["Tvdb"]; strings.HasPrefix(tvdbProviderId, "tt") {
+			os.Stdout.WriteString(item.GetName() + " " + tvdbProviderId + "\n")
 			removeBadTvdbIdAndLock(ctx, client, item.GetId(), adminUserId)
 		}
 	}
