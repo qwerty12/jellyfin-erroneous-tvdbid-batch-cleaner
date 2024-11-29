@@ -45,7 +45,7 @@ func getFirstAdminUserId(ctx context.Context, client *jf.APIClient) string {
 func removeBadTvdbIdAndLock(ctx context.Context, client *jf.APIClient, itemId, userId string) {
 	item, _, err := client.UserLibraryAPI.GetItem(ctx, itemId).UserId(userId).Execute()
 	if err != nil {
-		log.Println("Error when calling `GetItem`:", err)
+		log.Printf("Error when calling `GetItem` for item ID `%v`: %v\n", itemId, err)
 		return
 	}
 
@@ -54,8 +54,34 @@ func removeBadTvdbIdAndLock(ctx context.Context, client *jf.APIClient, itemId, u
 
 	_, err = client.ItemUpdateAPI.UpdateItem(ctx, itemId).BaseItemDto(*item).Execute()
 	if err != nil {
-		log.Println("Error when calling `UpdateItem`:", err)
+		log.Printf("Error when calling `UpdateItem` for item ID `%v`: %v\n", itemId, err)
 		return
+	}
+
+	if /*item.GetType() != jf.BASEITEMKIND_SERIES ||*/ item.GetChildCount() != 1 {
+		return
+	}
+
+	seasons, _, err := client.TvShowsAPI.GetSeasons(ctx, itemId).UserId(userId).Execute()
+	if err != nil {
+		log.Printf("Unable to get seasons for `%v`: %v\n", itemId, err)
+		return
+	}
+
+	for _, season := range seasons.Items {
+		seasonId := season.GetId()
+		seasonItem, _, err := client.UserLibraryAPI.GetItem(ctx, seasonId).UserId(userId).Execute()
+		if err != nil {
+			log.Printf("Error when calling `GetItem` for season item ID `%v`: %v\n", seasonId, err)
+			continue
+		}
+
+		seasonItem.SetLockData(true)
+
+		_, err = client.ItemUpdateAPI.UpdateItem(ctx, seasonId).BaseItemDto(*seasonItem).Execute()
+		if err != nil {
+			log.Printf("Error when calling `UpdateItem` for season item ID `%v`: %v\n", seasonId, err)
+		}
 	}
 }
 
